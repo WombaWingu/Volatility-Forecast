@@ -25,7 +25,6 @@ def rolling_covariance(
         cov_list.append((idx[t], cov))
     dates = [c[0] for c in cov_list]
     covs = np.array([c[1] for c in cov_list])
-    n_assets = ret.shape[1]
     cov_series = {}
     for i, d in enumerate(dates):
         cov_series[d] = covs[i]
@@ -50,7 +49,6 @@ def shrinkage_covariance(
     cov_series, _ = rolling_covariance(returns, window)
     out = {}
     for d, S in cov_series.items():
-        n = S.shape[0]
         F = np.diag(np.diag(S))
         S_shrink = (1 - shrinkage) * S + shrinkage * F
         out[d] = S_shrink
@@ -65,7 +63,6 @@ def ewma_covariance(
     Returns (cov_ewma DataFrame of annualized vols per asset, cov_by_date dict).
     """
     ret = returns.dropna(how="all").fillna(0)
-    n_assets = ret.shape[1]
     n_days = len(ret)
     cov = ret.iloc[:20].cov().values
     cov_list = []
