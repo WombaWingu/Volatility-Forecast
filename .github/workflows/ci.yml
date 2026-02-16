@@ -36,4 +36,4 @@ jobs:
       - name: Install ruff
         run: pip install ruff
       - name: Ruff check
-        run: ruff check volatility_*.py mini_proj.py
+        run: ruff check volatility_*.py scripts/mini_proj.py
