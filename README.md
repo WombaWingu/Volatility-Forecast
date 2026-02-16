@@ -93,6 +93,12 @@ streamlit run app_dashboard.py
 ```bash
 python run_cross_sectional.py --tickers "SPY,QQQ,IWM,XLF,XLE"
 ```
+### One-Command Demo
+
+```bash
+python volforecast_cli.py daily --ticker NVDA --model ewma --equity 20000 --export --report
+streamlit run app_dashboard.py
+```
 
 ## Project layout
 
@@ -115,8 +121,7 @@ python run_cross_sectional.py --tickers "SPY,QQQ,IWM,XLF,XLE"
 | `results/` | Experiment outputs |
 | `examples/` | Sample outputs |
 
-## Resume / portfolio
-
 **Tech:** Python, pandas, NumPy, scikit-learn, arch, yfinance, scipy, XGBoost, Streamlit.
 
 **Concepts:** Volatility modeling (EWMA, GARCH, HAR-RV, GAS), full predictive distributions (VaR/ES, Christoffersen, DQ, Fissler–Ziegel), economic value (vol-targeting, transaction costs, mean-variance utility), multi-asset covariance (rolling, shrinkage), portfolio construction (risk parity, min variance), ensembling (rank-weighted, stacking), experiment reproducibility.
+
