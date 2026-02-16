@@ -1,0 +1,28 @@
+{
+  "ticker": "NVDA",
+  "start": "2010-01-01",
+  "end": null,
+  "target_vol": 0.1,
+  "cap": 1.0,
+  "floor": 0.05,
+  "sizing_model": "ewma",
+  "account_equity": 20000,
+  "horizons": [
+    1,
+    5,
+    21
+  ],
+  "window": 1260,
+  "step": 2,
+  "models": [
+    "naive",
+    "roll_mean",
+    "har_rv",
+    "ewma",
+    "garch",
+    "ridge"
+  ],
+  "run_backtest": false,
+  "run_var_es": false,
+  "no_cache": false
+}
