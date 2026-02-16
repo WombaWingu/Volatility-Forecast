@@ -5,7 +5,7 @@ All outputs go to artifacts/ with date-organized subdirectories.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 
