@@ -107,6 +107,12 @@ def main() -> None:
     print("\n--- Average QLIKE (lower better) ---")
     print(rank_qlike.to_string())
 
+    out_dir = Path("artifacts/cross_sectional")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = out_dir / "cross_section_results.csv"   # or your chosen filename
+    df.to_csv(out_path, index=False)
+    
     # Which model wins per ticker (by MAE)
     wins = {}
     for ticker in full.index:
@@ -134,3 +140,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
