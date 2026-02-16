@@ -101,7 +101,6 @@ def es_forecast(
         scale = params.get("scale", 1.0)
         z_alpha = stats.t.ppf(alpha, df=df, loc=loc, scale=scale)
         # ES for t: closed form
-        from scipy.special import gammaln
         def t_es(alpha_val, df_val):
             x = stats.t.ppf(alpha_val, df_val)
             c = (df_val + x**2) / (df_val - 1)
