@@ -5,8 +5,6 @@ Diebold–Mariano test, prediction intervals, regime-conditioned metrics.
 
 from __future__ import annotations
 
-from typing import Callable
-
 import numpy as np
 import pandas as pd
 
@@ -59,9 +57,6 @@ def volatility_metrics_full(
     yhat: np.ndarray,
 ) -> dict[str, float]:
     """MAE, RMSE, Correlation, QLIKE, MSE_var, Log_vol."""
-    err = yhat - y
-    y2 = np.maximum(y ** 2, 1e-12)
-    s2 = np.maximum(yhat ** 2, 1e-12)
     corr = np.nan
     if np.nanstd(yhat) > 0 and np.nanstd(y) > 0:
         corr = float(np.corrcoef(y, yhat)[0, 1])
