@@ -1,0 +1,23 @@
+# Sample experiment config — SP500-style tickers
+tickers: ["SPY", "QQQ", "IWM"]
+start: "2015-01-01"
+end: "2026-02-12"
+window: 1260
+step: 2
+horizons: [1, 5, 21]
+models:
+  - naive
+  - roll_mean
+  - har_rv
+  - ewma
+  - garch
+  - gjr
+  - garch_t
+  - ridge
+  - gas
+  - ensemble
+seed: 42
+run_backtest: true
+run_var_es: true
+cost_bps: 5.0
+slippage_bps: 2.0

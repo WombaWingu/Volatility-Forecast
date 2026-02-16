@@ -1,0 +1,2 @@
+signal_date,trade_date,ticker,model_used,forecast_vol_ann,target_vol_ann,cap,floor,close,desired_shares_int,dollar_exposure,exposure_multiplier
+2026-02-13,2026-02-14,NVDA,ridge,0.35445013834922146,0.1,1.0,0.05,182.80999755859375,15,2742.1499633789062,0.27421499633789065
