@@ -7,7 +7,6 @@ calibration diagnostics (PIT histograms, exceedance clustering).
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 from scipy import stats
 
 
@@ -104,7 +103,6 @@ def dq_test(
     Returns (Wald_stat, p_value).
     """
     hit = hit_sequence(returns, var_series)
-    r = np.asarray(returns, dtype=float).ravel()
     v = np.asarray(var_series, dtype=float).ravel()
     n = len(hit)
     if n < lags + 20:
@@ -152,7 +150,6 @@ def es_quantile_backtest(
     r = np.asarray(returns, dtype=float).ravel()
     v = np.asarray(var_series, dtype=float).ravel()
     e = np.asarray(es_series, dtype=float).ravel()
-    n = len(r)
     mask = (hit > 0.5) & np.isfinite(v) & np.isfinite(e) & (e > 1e-10)
     n_viol = mask.sum()
     if n_viol < 5:
