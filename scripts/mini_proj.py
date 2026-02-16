@@ -15,15 +15,6 @@ import webbrowser
 from io import BytesIO
 from pathlib import Path
 
-# Suppress GARCH optimizer convergence warnings (from arch/scipy) before loading models
-warnings.filterwarnings("ignore", message=".*optimizer.*")
-warnings.filterwarnings("ignore", message=".*onvergence.*")
-try:
-    from scipy.optimize import OptimizeWarning
-    warnings.filterwarnings("ignore", category=OptimizeWarning)
-except ImportError:
-    pass
-
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -35,6 +26,15 @@ import volatility_eval as ve
 import volatility_models as vm
 import volatility_paths as vpaths
 import volatility_risk as vr
+
+# Suppress GARCH optimizer convergence warnings (from arch/scipy)
+warnings.filterwarnings("ignore", message=".*optimizer.*")
+warnings.filterwarnings("ignore", message=".*onvergence.*")
+try:
+    from scipy.optimize import OptimizeWarning
+    warnings.filterwarnings("ignore", category=OptimizeWarning)
+except ImportError:
+    pass
 
 # === CONFIG ===
 TICKER = "NVDA"
@@ -91,6 +91,7 @@ def run_pipeline(
     run_ridge_tuned: bool = False,
     cost_bps: float = 0.0,
     slippage_bps: float = 0.0,
+    use_cache: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     """
     Run full pipeline for one ticker. Returns:
@@ -99,16 +100,14 @@ def run_pipeline(
     - by_regime: regime x metrics
     - extras: backtest summary, DM p-values, etc.
     """
-    data = load_prices(ticker, start, end)
+    data = load_prices(ticker, start, end, use_cache=use_cache)
     simple_ret = data["Simple"].dropna()
     data = data.loc[simple_ret.index].copy()
 
     # Primary horizon for model fitting (use first in list, e.g. 1)
     h_primary = horizons[0]
-    ann_factor = np.sqrt(TRADING_DAYS / h_primary)
 
     # Realized vol: close-to-close and optional range-based (annualized)
-    rv_close = vd.realized_vol_close(simple_ret, h_primary)
     rv_fwd_ann = vd.forward_realized_vol(simple_ret, h_primary, TRADING_DAYS)
     data["roll_vol_fwd_ann"] = rv_fwd_ann
     if use_range_vol and "High" in data.columns:
@@ -381,7 +380,6 @@ def main() -> None:
     args = parser.parse_args(argv)
 
     horizons = [int(x) for x in args.horizons.split(",")]
-    use_cache = not args.no_cache
 
     summary_df, eval_data, by_regime, extras = run_pipeline(
         args.ticker, args.start, args.end,
@@ -391,6 +389,7 @@ def main() -> None:
         use_range_vol=True,
         run_backtest=args.backtest,
         run_ridge_tuned=args.ridge_tuned,
+        use_cache=not args.no_cache,
     )
 
     print(f"\nVolatility forecast comparison — {args.ticker} ({args.start} to {args.end})")
