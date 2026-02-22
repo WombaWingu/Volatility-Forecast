@@ -111,8 +111,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     out_path = out_dir / "cross_section_results.csv"   # or your chosen filename
-    df.to_csv(out_path, index=False)
-    
+    full.to_csv(out_path)
+
     # Which model wins per ticker (by MAE)
     wins = {}
     for ticker in full.index:
@@ -140,4 +140,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
