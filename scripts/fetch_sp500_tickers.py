@@ -16,7 +16,8 @@ WIKI_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 
 def fetch_sp500_tickers() -> list[str]:
     """Scrape S&P 500 symbols from Wikipedia. Returns list of ticker strings."""
-    tables = pd.read_html(WIKI_URL)
+    # Use html5lib so we don't require lxml (works in CI and minimal installs)
+    tables = pd.read_html(WIKI_URL, flavor="html5lib")
     # First table is current constituents
     df = tables[0]
     # Wikipedia column is usually "Symbol" (sometimes "Ticker")
