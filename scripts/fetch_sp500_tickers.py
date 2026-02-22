@@ -8,16 +8,22 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 import pandas as pd
 
 WIKI_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0"
 
 
 def fetch_sp500_tickers() -> list[str]:
     """Scrape S&P 500 symbols from Wikipedia. Returns list of ticker strings."""
+    # Fetch with a browser User-Agent to avoid 403 in CI (Wikipedia blocks default urllib)
+    req = Request(WIKI_URL, headers={"User-Agent": USER_AGENT})
+    with urlopen(req, timeout=30) as resp:
+        html = resp.read().decode("utf-8", errors="replace")
     # Use html5lib so we don't require lxml (works in CI and minimal installs)
-    tables = pd.read_html(WIKI_URL, flavor="html5lib")
+    tables = pd.read_html(html, flavor="html5lib")
     # First table is current constituents
     df = tables[0]
     # Wikipedia column is usually "Symbol" (sometimes "Ticker")
