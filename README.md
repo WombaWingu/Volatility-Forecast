@@ -58,6 +58,22 @@ pip install -e .
 
 ## How to run
 
+### Unified CLI (`volforecast_cli.py`)
+
+```bash
+# Daily forecast for one ticker (signals + optional tomorrow positions)
+python volforecast_cli.py daily --ticker NVDA --export --model ridge
+
+# Cross-sectional comparison across many tickers
+python volforecast_cli.py cross-sectional --tickers "SPY,QQQ,IWM" --export artifacts/cross_sectional/results.csv
+
+# Experiments from YAML config
+python volforecast_cli.py experiments --config configs/sp500_sample.yaml
+
+# Generate tomorrow's position from latest signals
+python volforecast_cli.py tomorrow-position --ticker NVDA
+```
+
 ### Single-asset pipeline (`mini_proj.py`)
 
 ```bash
@@ -88,22 +104,37 @@ python leaderboard.py --run <run_id>                   # Specific run
 streamlit run app_dashboard.py
 ```
 
-### Cross-sectional
+### Cross-sectional and S&P 500 top stocks
+
+Run cross-sectional comparison on a custom list or the full S&P 500, then get the top N stocks by volatility forecast accuracy (ridge MAE):
 
 ```bash
-python run_cross_sectional.py --tickers "SPY,QQQ,IWM,XLF,XLE"
-```
-### One-Command Demo
+# Custom tickers
+python volforecast_cli.py cross-sectional --tickers "SPY,QQQ,IWM,XLF,XLE" --export artifacts/cross_sectional/cross_section_results.csv
 
-```bash
-python volforecast_cli.py daily --ticker NVDA --model ewma --equity 20000 --export --report
-streamlit run app_dashboard.py
+# Fetch current S&P 500 list from Wikipedia, then run cross-sectional
+python scripts/fetch_sp500_tickers.py --format csv --out data/sp500_tickers.txt
+python volforecast_cli.py cross-sectional --tickers "$(cat data/sp500_tickers.txt)" --export artifacts/cross_sectional/cross_section_results.csv
+
+# Top 10 stocks to invest (best forecast accuracy)
+python scripts/top_stocks_from_cross_section.py artifacts/cross_sectional/cross_section_results.csv -n 10 --out artifacts/cross_sectional/top10_stocks.csv
 ```
+
+Or use the script directly: `python scripts/run_cross_sectional.py --tickers "SPY,QQQ,IWM" --export path.csv`
+
+### Daily workflow (GitHub Actions)
+
+The `.github/workflows/daily.yml` workflow runs on a schedule (Mon–Fri after market close) and on manual dispatch. It:
+
+1. **test** — Runs the test suite.
+2. **daily** — Runs the daily forecast for NVDA and uploads artifacts.
+3. **cross_sectional** — Fetches the S&P 500 list from Wikipedia, runs cross-sectional for all constituents, computes the **top 10 stocks** by ridge MAE (best volatility forecast accuracy), and uploads `artifacts/cross_sectional/` (including `top10_stocks.csv`).
 
 ## Project layout
 
 | File | Purpose |
 |------|---------|
+| `volforecast_cli.py` | Unified CLI: daily, cross-sectional, experiments, tomorrow-position |
 | `mini_proj.py` | Main pipeline: load data, run models, eval, report |
 | `volatility_models.py` | EWMA, GARCH/GJR/GARCH-t, HAR-RV, Ridge |
 | `volatility_data.py` | Range-based vol, realized vol, forward targets |
@@ -117,11 +148,12 @@ streamlit run app_dashboard.py
 | `run_experiments.py` | Experiment runner (YAML config) |
 | `leaderboard.py` | Leaderboard script |
 | `app_dashboard.py` | Streamlit dashboard |
+| `scripts/run_cross_sectional.py` | Cross-sectional model comparison across tickers |
+| `scripts/fetch_sp500_tickers.py` | Fetch S&P 500 ticker list from Wikipedia |
+| `scripts/top_stocks_from_cross_section.py` | Top N stocks from cross-sectional results (by ridge MAE) |
 | `configs/` | YAML experiment configs |
 | `results/` | Experiment outputs |
+| `artifacts/` | Daily/cross-sectional outputs (signals, metrics, top10) |
+| `.github/workflows/daily.yml` | CI: tests, daily NVDA, S&P 500 cross-sectional + top 10 |
 | `examples/` | Sample outputs |
-
-**Tech:** Python, pandas, NumPy, scikit-learn, arch, yfinance, scipy, XGBoost, Streamlit.
-
-**Concepts:** Volatility modeling (EWMA, GARCH, HAR-RV, GAS), full predictive distributions (VaR/ES, Christoffersen, DQ, Fissler–Ziegel), economic value (vol-targeting, transaction costs, mean-variance utility), multi-asset covariance (rolling, shrinkage), portfolio construction (risk parity, min variance), ensembling (rank-weighted, stacking), experiment reproducibility.
-
+(rank-weighted, stacking), experiment reproducibility.
