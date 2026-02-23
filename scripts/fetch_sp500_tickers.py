@@ -38,10 +38,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch S&P 500 ticker list from Wikipedia")
     parser.add_argument("--format", choices=["csv", "lines"], default="csv", help="Output: csv (comma-separated) or lines")
     parser.add_argument("--out", type=str, default="", help="Optional: write list to file (one ticker per line)")
+    parser.add_argument("--limit", type=int, default=None, help="Use only first N tickers (default: all)")
     args = parser.parse_args()
 
     try:
         tickers = fetch_sp500_tickers()
+        if args.limit is not None:
+            tickers = tickers[: args.limit]
     except Exception as e:
         print(f"Error fetching S&P 500 list: {e}", file=sys.stderr)
         sys.exit(1)
