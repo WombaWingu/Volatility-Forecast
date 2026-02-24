@@ -7,7 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-import volatility_models as vm
+from . import models as vm
 
 
 def gas_volatility_rolling(

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import volatility_data as vd
+from volforecast import data as vd
 
 
 def test_parkinson_vol():

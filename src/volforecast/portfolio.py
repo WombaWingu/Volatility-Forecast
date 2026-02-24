@@ -7,31 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# Import multicov - handle both package and root imports
-import sys
-from pathlib import Path
-
-# Add project root to path
-_project_root = Path(__file__).resolve().parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-try:
-    from volforecast import multicov as vmc
-except ImportError:
-    try:
-        # Try importing from src/volforecast directly
-        import importlib.util
-        multicov_path = _project_root / "src" / "volforecast" / "multicov.py"
-        if multicov_path.exists():
-            spec = importlib.util.spec_from_file_location("multicov", multicov_path)
-            vmc = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(vmc)
-        else:
-            raise ImportError
-    except Exception:
-        # Fallback: import from root
-        import volatility_multicov as vmc
+from . import multicov as vmc
 
 
 def risk_parity_weights(cov: np.ndarray) -> np.ndarray:

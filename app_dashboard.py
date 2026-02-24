@@ -15,14 +15,14 @@ import streamlit as st
 _project_root = Path(__file__).resolve().parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+src_dir = _project_root / "src"
+if src_dir.exists() and str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 scripts_dir = _project_root / "scripts"
 if scripts_dir.exists() and str(scripts_dir) not in sys.path:
     sys.path.insert(0, str(scripts_dir))
 
-try:
-    import volatility_paths as vpaths
-except ImportError:
-    vpaths = None
+from volforecast import paths as vpaths
 
 st.set_page_config(page_title="Volatility Forecast", page_icon="📈", layout="wide")
 st.title("📈 Volatility Forecast Dashboard")
@@ -84,9 +84,9 @@ if use_artifacts and latest_date and signals_file is not None and signals_file.e
             st.session_state["ready"] = False
 
 from mini_proj import load_prices, run_pipeline, HORIZONS, TRADING_DAYS, WINDOW, STEP
-import volatility_backtest as vbt
-import volatility_distributions as vdist
-import volatility_risk as vr
+from volforecast import backtest as vbt
+from volforecast import distributions as vdist
+from volforecast import risk as vr
 
 if st.sidebar.button("Run pipeline"):
     with st.spinner("Running pipeline..."):

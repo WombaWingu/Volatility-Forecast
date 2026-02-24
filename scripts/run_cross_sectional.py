@@ -7,13 +7,20 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
 
-import volatility_data as vd
-import volatility_eval as ve
-import volatility_models as vm
+# Ensure `src/` is importable when running as a script
+_root = Path(__file__).resolve().parent.parent
+_src = _root / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+
+from volforecast import data as vd
+from volforecast import eval as ve
+from volforecast import models as vm
 from mini_proj import load_prices, WINDOW, STEP, TRADING_DAYS
 
 # Default universe: SPY + sector ETFs or a few names

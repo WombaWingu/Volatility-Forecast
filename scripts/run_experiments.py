@@ -15,14 +15,23 @@ import pandas as pd
 import yaml
 
 from mini_proj import load_prices, run_pipeline, CACHE_DIR, HORIZONS, TRADING_DAYS, WINDOW, STEP
-import volatility_backtest as vbt
-import volatility_distributions as vdist
-import volatility_eval as ve
-import volatility_ensemble as vens
-import volatility_models as vm
-import volatility_risk as vr
-import volatility_data as vd
-import volatility_paths as vpaths
+
+import sys
+
+# Ensure `src/` is importable when running as a script
+_root = Path(__file__).resolve().parent.parent
+_src = _root / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+
+from volforecast import backtest as vbt
+from volforecast import distributions as vdist
+from volforecast import eval as ve
+from volforecast import ensemble as vens
+from volforecast import models as vm
+from volforecast import risk as vr
+from volforecast import data as vd
+from volforecast import paths as vpaths
 
 # Use artifacts/experiments/ for all experiment outputs
 RESULTS_DIR = vpaths.EXPERIMENTS_DIR

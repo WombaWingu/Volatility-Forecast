@@ -2,6 +2,17 @@
 
 A **volatility forecasting** pipeline for equity research: baselines, **HAR-RV**, **GARCH** family (GJR, EGARCH, Student-t), **GAS**, **Ridge**, **XGBoost**, **ensemble**; evaluation (QLIKE, Diebold–Mariano, regime breakdown); **full predictive distributions** (VaR/ES, Christoffersen, DQ, Fissler–Ziegel); **economic value** (vol-targeting with transaction costs, mean-variance utility); **multi-asset** covariance and portfolio construction (risk parity, min variance); **experiment runner** with YAML config; **Streamlit dashboard**. Suitable as a portfolio or research project.
 
+**Project Snapshot (PDF):** [`docs/Project_Report.pdf`](docs/Project_Report.pdf)
+
+## Quickstart
+
+```bash
+pip install -r requirements.txt
+python volforecast_cli.py daily --ticker NVDA --export --model ridge
+```
+
+Outputs are written under `artifacts/` (signals + metrics + reports) and are ignored by git.
+
 ## Features
 
 ### Models
@@ -33,7 +44,7 @@ A **volatility forecasting** pipeline for equity research: baselines, **HAR-RV**
 
 ### Experiment Runner
 - YAML/JSON config (tickers, horizons, models, seeds)
-- Save to `/results/` with unique run id
+- Save to `artifacts/experiments/` with unique run id
 - **Leaderboard** script: average metrics by model, regime-conditioned tables, DM summary
 
 ### Dashboard & Reports
@@ -77,18 +88,18 @@ python volforecast_cli.py tomorrow-position --ticker NVDA
 ### Single-asset pipeline (`mini_proj.py`)
 
 ```bash
-python mini_proj.py                                    # Metrics table
-python mini_proj.py --ticker SPY --start 2015-01-01    # Override ticker/dates
-python mini_proj.py --plot                             # Plot forecasts vs realized
-python mini_proj.py --report                           # Generate volatility_report.html
-python mini_proj.py --backtest                         # Vol-targeting + VaR/ES validation
+python scripts/mini_proj.py                                    # Metrics table
+python scripts/mini_proj.py --ticker SPY --start 2015-01-01    # Override ticker/dates
+python scripts/mini_proj.py --plot                             # Plot forecasts vs realized
+python scripts/mini_proj.py --report                           # Generate volatility_report.html
+python scripts/mini_proj.py --backtest                         # Vol-targeting + VaR/ES validation
 ```
 
 ### Experiment runner
 
 ```bash
-python run_experiments.py --config configs/sp500_sample.yaml
-# Results in results/<run_id>/
+python scripts/run_experiments.py --config configs/sp500_sample.yaml
+# Outputs in artifacts/experiments/<run_id>/
 ```
 
 ### Leaderboard
@@ -128,32 +139,28 @@ The `.github/workflows/daily.yml` workflow runs on a schedule (Mon–Fri after m
 
 1. **test** — Runs the test suite.
 2. **daily** — Runs the daily forecast for NVDA and uploads artifacts.
-3. **cross_sectional** — Fetches the S&P 500 list from Wikipedia, runs cross-sectional for all constituents, computes the **top 10 stocks** by ridge MAE (best volatility forecast accuracy), and uploads `artifacts/cross_sectional/` (including `top10_stocks.csv`).
+3. **cross_sectional** — Fetches the S&P 500 list from Wikipedia (first 200 tickers for speed), runs cross-sectional on them, computes the **top 10 stocks** by ridge MAE (best volatility forecast accuracy), and uploads `artifacts/cross_sectional/` (including `top10_stocks.csv`).
 
 ## Project layout
 
 | File | Purpose |
 |------|---------|
 | `volforecast_cli.py` | Unified CLI: daily, cross-sectional, experiments, tomorrow-position |
-| `mini_proj.py` | Main pipeline: load data, run models, eval, report |
-| `volatility_models.py` | EWMA, GARCH/GJR/GARCH-t, HAR-RV, Ridge |
-| `volatility_data.py` | Range-based vol, realized vol, forward targets |
-| `volatility_eval.py` | QLIKE, Diebold–Mariano, regime metrics |
-| `volatility_backtest.py` | Vol-targeting, VaR/ES, economic value |
-| `volatility_risk.py` | Christoffersen, DQ, FZ scoring, PIT |
-| `volatility_distributions.py` | Density forecasts, VaR/ES from residuals |
-| `volatility_multicov.py` | Rolling/shrinkage/EWMA covariance |
-| `volatility_portfolio.py` | Risk parity, min variance backtests |
-| `volatility_ensemble.py` | GAS, XGBoost, rank-weighted ensemble |
-| `run_experiments.py` | Experiment runner (YAML config) |
+| `src/volforecast/` | Package modules (data/models/eval/backtest/risk/etc.) |
+| `scripts/mini_proj.py` | Main pipeline runner (single ticker) |
+| `scripts/run_experiments.py` | Experiment runner (YAML config) |
 | `leaderboard.py` | Leaderboard script |
 | `app_dashboard.py` | Streamlit dashboard |
 | `scripts/run_cross_sectional.py` | Cross-sectional model comparison across tickers |
 | `scripts/fetch_sp500_tickers.py` | Fetch S&P 500 ticker list from Wikipedia |
 | `scripts/top_stocks_from_cross_section.py` | Top N stocks from cross-sectional results (by ridge MAE) |
 | `configs/` | YAML experiment configs |
-| `results/` | Experiment outputs |
 | `artifacts/` | Daily/cross-sectional outputs (signals, metrics, top10) |
-| `.github/workflows/daily.yml` | CI: tests, daily NVDA, S&P 500 cross-sectional + top 10 |
+| `.github/workflows/daily.yml` | CI: tests, daily NVDA, cross-sectional (200 stocks) + top 10 |
 | `examples/` | Sample outputs |
-(rank-weighted, stacking), experiment reproducibility.
+
+## Resume / portfolio
+
+**Tech:** Python, pandas, NumPy, scikit-learn, arch, yfinance, scipy, XGBoost, Streamlit.
+
+**Concepts:** Volatility modeling (EWMA, GARCH, HAR-RV, GAS), full predictive distributions (VaR/ES, Christoffersen, DQ, Fissler–Ziegel), economic value (vol-targeting, transaction costs, mean-variance utility), multi-asset covariance (rolling, shrinkage), portfolio construction (risk parity, min variance), ensembling (rank-weighted, stacking), experiment reproducibility.

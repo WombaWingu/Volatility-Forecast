@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-import volatility_eval as ve
+from volforecast import eval as ve
 
 
 def test_loss_mae_rmse():

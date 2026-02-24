@@ -7,46 +7,20 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
-# Import from root modules (package structure exists but modules still in root for compatibility)
-import sys
-from pathlib import Path
-
-# Add project root to path for imports
-_project_root = Path(__file__).resolve().parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-# Import from root modules (they're still there)
-import volatility_paths as vpaths
-
-# Import portfolio functions directly from src/volforecast/portfolio.py
-import importlib.util
-portfolio_path = _project_root / "src" / "volforecast" / "portfolio.py"
-if portfolio_path.exists():
-    spec = importlib.util.spec_from_file_location("portfolio_module", portfolio_path)
-    portfolio_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(portfolio_module)
-    compute_target_shares = portfolio_module.compute_target_shares
-    generate_tomorrow_positions = portfolio_module.generate_tomorrow_positions
-else:
-    # Fallback: try root module
-    try:
-        import volatility_portfolio as portfolio_module
-        compute_target_shares = portfolio_module.compute_target_shares
-        generate_tomorrow_positions = portfolio_module.generate_tomorrow_positions
-    except (ImportError, AttributeError):
-        raise ImportError("Could not import portfolio functions. Make sure portfolio.py exists.")
+from . import paths as vpaths
+from .portfolio import compute_target_shares, generate_tomorrow_positions
 
 
 def cmd_daily(args):
     """Run daily volatility forecast and generate signals + tomorrow positions."""
     # Import here to avoid circular dependencies
     # mini_proj is in scripts/ directory
+    _project_root = Path(__file__).resolve().parent.parent.parent
     scripts_dir = _project_root / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
@@ -121,6 +95,7 @@ def cmd_daily(args):
 def cmd_cross_sectional(args):
     """Run cross-sectional comparison across multiple tickers."""
     # Import from scripts directory
+    _project_root = Path(__file__).resolve().parent.parent.parent
     scripts_dir = _project_root / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
@@ -140,6 +115,7 @@ def cmd_cross_sectional(args):
 def cmd_experiments(args):
     """Run experiments from config file."""
     # Import from scripts directory
+    _project_root = Path(__file__).resolve().parent.parent.parent
     scripts_dir = _project_root / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))

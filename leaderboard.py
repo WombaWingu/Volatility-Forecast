@@ -10,13 +10,18 @@ from pathlib import Path
 
 import pandas as pd
 
-try:
-    import volatility_paths as vpaths
-    RESULTS_DIR = vpaths.EXPERIMENTS_DIR
-    LEADERBOARD_CSV = vpaths.EXPERIMENTS_DIR / "leaderboard.csv"
-except ImportError:
-    RESULTS_DIR = Path(__file__).resolve().parent / "results"
-    LEADERBOARD_CSV = Path(__file__).resolve().parent / "artifacts" / "experiments" / "leaderboard.csv"
+import sys
+
+# Ensure `src/` is importable when running as a script
+_root = Path(__file__).resolve().parent
+_src = _root / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+
+from volforecast import paths as vpaths
+
+RESULTS_DIR = vpaths.EXPERIMENTS_DIR
+LEADERBOARD_CSV = vpaths.EXPERIMENTS_DIR / "leaderboard.csv"
 
 
 def load_run(run_dir: Path) -> dict:

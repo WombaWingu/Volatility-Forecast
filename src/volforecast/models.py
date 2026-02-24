@@ -19,7 +19,7 @@ try:
 except ImportError:
     arch_model = None
 
-import volatility_data as vd
+from . import data as vd
 
 
 def realized_vol(returns: pd.Series, window: int = 5) -> pd.Series:

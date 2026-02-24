@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import volatility_models as vm
+from volforecast import models as vm
 
 
 @pytest.fixture
