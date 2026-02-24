@@ -159,8 +159,4 @@ The `.github/workflows/daily.yml` workflow runs on a schedule (Mon–Fri after m
 | `.github/workflows/daily.yml` | CI: tests, daily NVDA, cross-sectional (200 stocks) + top 10 |
 | `examples/` | Sample outputs |
 
-## Resume / portfolio
 
-**Tech:** Python, pandas, NumPy, scikit-learn, arch, yfinance, scipy, XGBoost, Streamlit.
-
-**Concepts:** Volatility modeling (EWMA, GARCH, HAR-RV, GAS), full predictive distributions (VaR/ES, Christoffersen, DQ, Fissler–Ziegel), economic value (vol-targeting, transaction costs, mean-variance utility), multi-asset covariance (rolling, shrinkage), portfolio construction (risk parity, min variance), ensembling (rank-weighted, stacking), experiment reproducibility.
