@@ -61,7 +61,7 @@ jobs:
           pip install -r requirements.txt
           pip install html5lib
       - name: Fetch S&P 500 tickers (first 200)
-        run: python scripts/fetch_sp500_tickers.py --format csv --out data/sp500_tickers.txt --limit 200
+        run: python scripts/fetch_sp500_tickers.py --format csv --out data/sp500_tickers.txt
       - name: Run cross-sectional (200 stocks)
         run: |
           TICKERS=$(cat data/sp500_tickers.txt)
