@@ -39,7 +39,7 @@ jobs:
           pip install -r requirements.txt
       - name: Run daily forecast (NVDA)
         run: |
-          python volforecast_cli.py daily --ticker SPY --export --model ridge --equity 100000
+          python volforecast_cli.py daily --ticker NVDA --export --model ridge --equity 100000
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -63,12 +63,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install alpaca-py
-      - name: Run daily forecast (SPY, $500 paper account)
+      - name: Run daily forecast for ETF universe
         run: |
-          python volforecast_cli.py daily --ticker SPY --export --model ridge --equity 100000
-      - name: Execute paper trades
+          DATE=$(date +%Y-%m-%d)
+          for TICKER in SPY QQQ IWM XLF XLE GLD TLT VXX; do
+            echo "--- Forecasting $TICKER ---"
+            python volforecast_cli.py daily --ticker $TICKER --export --model ridge --equity 100000
+            # Save per-ticker copies before the next ticker overwrites them
+            cp artifacts/signals/$DATE/tomorrow_positions.csv artifacts/signals/$DATE/tomorrow_positions_${TICKER}.csv
+            cp artifacts/signals/$DATE/volatility_signals.csv  artifacts/signals/$DATE/volatility_signals_${TICKER}.csv
+          done
+      - name: Select best ETF by predicted Sharpe
         run: |
-          python alpaca_executor.py --ticker SPY
+          python alpaca_selector.py
+      - name: Execute paper trade (rotate to selected ETF)
+        run: |
+          python alpaca_executor.py
       - name: Upload paper trading artifacts
         uses: actions/upload-artifact@v4
         with:
