@@ -42,7 +42,7 @@ import volatility_paths as vpaths  # noqa: E402
 ALLOWED_TICKERS = {"SPY", "QQQ", "IWM"}
 # Hard cap: dollar_exposure from the signal must not exceed this amount.
 # Keeps a $500 paper account from accidentally over-exposing.
-MAX_DOLLAR_EXPOSURE = 500.0
+MAX_DOLLAR_EXPOSURE = 100_000.0
 
 LOG_FIELDNAMES = [
     "timestamp",
