@@ -65,7 +65,7 @@ jobs:
           pip install alpaca-py
       - name: Run daily forecast (SPY, $500 paper account)
         run: |
-          python volforecast_cli.py daily --ticker SPY --export --model ridge --equity 500
+          python volforecast_cli.py daily --ticker SPY --export --model ridge --equity 100000
       - name: Execute paper trades
         run: |
           python alpaca_executor.py --ticker SPY
