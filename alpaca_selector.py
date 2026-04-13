@@ -1,19 +1,18 @@
 """
-Alpaca paper trading executor — single-ETF rotation strategy.
+ETF universe signal selector.
 
-Reads selected_position.csv (written by alpaca_selector.py), then:
-  1. Closes any open position that is NOT the selected ETF.
-  2. Buys / adjusts the selected ETF to its target share count.
+For each ETF in the universe:
+  1. Reads volatility_signals_<TICKER>.csv   — for recent closes (momentum)
+  2. Reads tomorrow_positions_<TICKER>.csv  — for forecast_vol_ann + desired shares
 
-Each order (including no-ops) is appended to:
-    artifacts/signals/<DATE>/orders.csv
+Scores each ETF with predicted Sharpe = annualized 20-day momentum / forecast_vol_ann.
+Picks the single ETF with the highest score and writes two files:
 
-Required environment variables:
-    ALPACA_API_KEY    — Alpaca API key ID
-    ALPACA_SECRET_KEY — Alpaca secret key
+    artifacts/signals/<DATE>/selected_position.csv   — winning ETF + position details
+    artifacts/signals/<DATE>/sharpe_scores.csv        — all ETFs ranked for inspection
 
 Usage:
-    python alpaca_executor.py [--date 2026-04-10] [--dry-run]
+    python alpaca_selector.py [--date 2026-04-10] [--window 20]
 """
 
 from __future__ import annotations
@@ -21,10 +20,11 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
-import os
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
+
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Path setup
@@ -40,21 +40,30 @@ import volatility_paths as vpaths  # noqa: E402
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-# Hard cap: never let dollar_exposure from the signal exceed this.
-MAX_DOLLAR_EXPOSURE = 100_000.0
+ETF_UNIVERSE = ["SPY", "QQQ", "IWM", "XLF", "XLE", "GLD", "TLT", "VXX"]
 
-LOG_FIELDNAMES = [
-    "timestamp",
+SELECTED_FIELDNAMES = [
     "ticker",
-    "action",           # "open" | "close" | "adjust" | "no_change"
-    "shares",
-    "side",             # "buy" | "sell"
-    "order_id",
-    "status",
+    "signal_date",
+    "trade_date",
+    "desired_shares_int",
     "dollar_exposure",
     "forecast_vol_ann",
+    "trailing_return_ann",
     "predicted_sharpe",
-    "error",
+    "close",
+    "exposure_multiplier",
+]
+
+SCORES_FIELDNAMES = [
+    "rank",
+    "ticker",
+    "predicted_sharpe",
+    "trailing_return_ann",
+    "forecast_vol_ann",
+    "desired_shares_int",
+    "dollar_exposure",
+    "close",
 ]
 
 # ---------------------------------------------------------------------------
@@ -69,207 +78,117 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Signal reader
+# Data readers
 # ---------------------------------------------------------------------------
-def read_selected_position(date_str: str) -> dict | None:
-    """Read selected_position.csv written by alpaca_selector.py."""
-    path = vpaths.SIGNALS_DIR / date_str / "selected_position.csv"
+def load_positions(ticker: str, date_str: str) -> dict | None:
+    """Read tomorrow_positions_<TICKER>.csv; return first row as dict or None."""
+    path = vpaths.SIGNALS_DIR / date_str / f"tomorrow_positions_{ticker}.csv"
     if not path.exists():
-        log.error("selected_position.csv not found: %s", path)
-        log.error("Run alpaca_selector.py first.")
+        log.warning("%s: positions file not found (%s)", ticker, path)
         return None
     with open(path, newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
             return row
-    log.error("selected_position.csv is empty: %s", path)
+    log.warning("%s: positions file is empty", ticker)
     return None
 
 
-# ---------------------------------------------------------------------------
-# Order log
-# ---------------------------------------------------------------------------
-def append_order_log(date_str: str, record: dict) -> None:
-    """Append one row to artifacts/signals/<date_str>/orders.csv."""
-    orders_path = vpaths.get_signals_dir(date_str) / "orders.csv"
-    write_header = not orders_path.exists()
-    with open(orders_path, "a", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=LOG_FIELDNAMES, extrasaction="ignore")
-        if write_header:
-            writer.writeheader()
-        writer.writerow(record)
-    log.info("Order logged → %s", orders_path)
-
-
-def _blank_record(ticker: str, action: str, status: str, error: str = "") -> dict:
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "ticker": ticker,
-        "action": action,
-        "shares": 0,
-        "side": "",
-        "order_id": "",
-        "status": status,
-        "dollar_exposure": 0,
-        "forecast_vol_ann": 0,
-        "predicted_sharpe": 0,
-        "error": error,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Order helpers
-# ---------------------------------------------------------------------------
-def _submit_market_order(client, ticker: str, qty: int, side, dry_run: bool) -> dict:
+def load_closes(ticker: str, date_str: str) -> pd.Series | None:
     """
-    Submit a market order.  Returns a partial log record (no timestamp/ticker).
-    Errors are caught and surfaced in the record — never raised.
+    Read volatility_signals_<TICKER>.csv and return the Close series,
+    sorted oldest-first.
     """
-    from alpaca.trading.enums import TimeInForce
-    from alpaca.trading.requests import MarketOrderRequest
-
-    record = {"shares": qty, "side": side.value, "order_id": "", "status": "", "error": ""}
-
-    if dry_run:
-        log.info("[DRY RUN] Would %s %d share(s) of %s.", side.value, qty, ticker)
-        record["status"] = "dry_run"
-        return record
-
-    try:
-        req = MarketOrderRequest(
-            symbol=ticker,
-            qty=qty,
-            side=side,
-            # DAY orders placed after market hours queue for next open —
-            # ideal for signals generated after the 4 PM ET close.
-            time_in_force=TimeInForce.DAY,
-        )
-        order = client.submit_order(req)
-        record["order_id"] = str(order.id)
-        record["status"] = str(order.status)
-        log.info(
-            "Order submitted — %s %d %s | id=%s status=%s",
-            side.value, qty, ticker, order.id, order.status,
-        )
-    except Exception as exc:
-        record["status"] = "error"
-        record["error"] = str(exc)
-        log.error("Order submission failed for %s %d %s: %s", side.value, qty, ticker, exc)
-
-    return record
+    path = vpaths.SIGNALS_DIR / date_str / f"volatility_signals_{ticker}.csv"
+    if not path.exists():
+        log.warning("%s: signals file not found (%s)", ticker, path)
+        return None
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
+    if "Close" not in df.columns:
+        log.warning("%s: no Close column in signals file", ticker)
+        return None
+    return df["Close"].dropna().sort_index()
 
 
 # ---------------------------------------------------------------------------
-# Core execution
+# Sharpe scoring
 # ---------------------------------------------------------------------------
-def execute_rotation(selected: dict, dry_run: bool = False) -> list[dict]:
+def annualized_momentum(closes: pd.Series, window: int) -> float | None:
     """
-    Reconcile Alpaca paper account with the selected position.
+    Trailing *window*-day return annualized to 252 trading days.
 
-    Steps:
-      1. Close every open position that is NOT the selected ticker.
-      2. Buy / adjust the selected ticker to its target share count.
-
-    Returns a list of log-record dicts (one per order or no-op).
+    Returns None if there are not enough observations.
     """
-    from alpaca.trading.client import TradingClient
-    from alpaca.trading.enums import OrderSide
+    if len(closes) < window + 1:
+        return None
+    r = float(closes.iloc[-1] / closes.iloc[-(window + 1)] - 1)
+    return (1.0 + r) ** (252.0 / window) - 1.0
 
-    api_key = os.environ.get("ALPACA_API_KEY", "")
-    secret_key = os.environ.get("ALPACA_SECRET_KEY", "")
-    if not api_key or not secret_key:
-        raise EnvironmentError(
-            "ALPACA_API_KEY and ALPACA_SECRET_KEY must be set as environment variables."
-        )
 
-    selected_ticker = selected["ticker"].upper()
-    desired_shares = int(selected["desired_shares_int"])
-    dollar_exposure = float(selected.get("dollar_exposure", 0))
-    forecast_vol = float(selected.get("forecast_vol_ann", 0))
-    predicted_sharpe = float(selected.get("predicted_sharpe", 0))
+def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
+    """
+    Compute predicted Sharpe for one ETF.
 
-    # Safety guard
-    if dollar_exposure > MAX_DOLLAR_EXPOSURE:
+    Returns a score dict or None if any required data is missing.
+    """
+    positions = load_positions(ticker, date_str)
+    if positions is None:
+        return None
+
+    forecast_vol = float(positions.get("forecast_vol_ann", 0) or 0)
+    if forecast_vol <= 0:
+        log.warning("%s: zero or missing forecast_vol_ann — skipping", ticker)
+        return None
+
+    closes = load_closes(ticker, date_str)
+    if closes is None:
+        return None
+
+    trailing_ret = annualized_momentum(closes, window)
+    if trailing_ret is None:
         log.warning(
-            "Signal dollar_exposure $%.2f exceeds cap $%.2f — setting desired_shares=0.",
-            dollar_exposure, MAX_DOLLAR_EXPOSURE,
+            "%s: not enough price history for %d-day momentum (have %d rows) — skipping",
+            ticker, window, len(closes),
         )
-        desired_shares = 0
+        return None
 
-    client = TradingClient(api_key, secret_key, paper=True)
+    # Predicted Sharpe: annualized momentum / forecast vol (risk-free ≈ 0 for ranking)
+    predicted_sharpe = trailing_ret / max(forecast_vol, 1e-6)
 
-    # Fetch all open positions (returns [] when account is flat)
-    try:
-        open_positions = client.get_all_positions()
-    except Exception as exc:
-        raise RuntimeError(f"Could not fetch open positions from Alpaca: {exc}") from exc
-
-    current_by_ticker: dict[str, int] = {}
-    for pos in open_positions:
-        current_by_ticker[pos.symbol.upper()] = int(float(pos.qty))
-
-    log.info("Open positions: %s", dict(current_by_ticker) or "none")
-    log.info(
-        "Target: %s  desired_shares=%d  $%.0f  vol=%.4f  sharpe=%.4f",
-        selected_ticker, desired_shares, dollar_exposure, forecast_vol, predicted_sharpe,
-    )
-
-    records: list[dict] = []
-    now = datetime.utcnow().isoformat()
-
-    # --- Step 1: close any position NOT in the selected ticker ---
-    for ticker, current_shares in current_by_ticker.items():
-        if ticker == selected_ticker:
-            continue
-        if current_shares <= 0:
-            continue
-
-        log.info("Closing stale position: %s (%d shares)", ticker, current_shares)
-        partial = _submit_market_order(client, ticker, current_shares, OrderSide.SELL, dry_run)
-        records.append({
-            "timestamp": now,
-            "ticker": ticker,
-            "action": "close",
-            "dollar_exposure": 0,
-            "forecast_vol_ann": 0,
-            "predicted_sharpe": 0,
-            **partial,
-        })
-
-    # --- Step 2: open / adjust the selected ticker ---
-    current_shares = current_by_ticker.get(selected_ticker, 0)
-    delta = desired_shares - current_shares
-    log.info(
-        "%s — desired=%d  current=%d  delta=%+d",
-        selected_ticker, desired_shares, current_shares, delta,
-    )
-
-    base_record = {
-        "timestamp": now,
-        "ticker": selected_ticker,
-        "dollar_exposure": dollar_exposure,
+    return {
+        "ticker": ticker,
+        "signal_date": positions.get("signal_date", ""),
+        "trade_date": positions.get("trade_date", ""),
+        "desired_shares_int": int(positions.get("desired_shares_int", 0)),
+        "dollar_exposure": float(positions.get("dollar_exposure", 0)),
         "forecast_vol_ann": forecast_vol,
+        "trailing_return_ann": trailing_ret,
         "predicted_sharpe": predicted_sharpe,
+        "close": float(positions.get("close", 0)),
+        "exposure_multiplier": float(positions.get("exposure_multiplier", 0)),
     }
 
-    if delta == 0:
-        log.info("%s: already at target — no order needed.", selected_ticker)
-        records.append({
-            **base_record,
-            "action": "no_change",
-            "shares": 0,
-            "side": "",
-            "order_id": "",
-            "status": "skipped",
-            "error": "",
-        })
-    else:
-        side = OrderSide.BUY if delta > 0 else OrderSide.SELL
-        action = "open" if current_shares == 0 and delta > 0 else "adjust"
-        partial = _submit_market_order(client, selected_ticker, abs(delta), side, dry_run)
-        records.append({**base_record, "action": action, **partial})
 
-    return records
+# ---------------------------------------------------------------------------
+# Output writers
+# ---------------------------------------------------------------------------
+def write_selected(date_str: str, best: dict) -> Path:
+    path = vpaths.get_signals_dir(date_str) / "selected_position.csv"
+    with open(path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=SELECTED_FIELDNAMES, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerow(best)
+    return path
+
+
+def write_scores(date_str: str, scores: list[dict]) -> Path:
+    path = vpaths.get_signals_dir(date_str) / "sharpe_scores.csv"
+    with open(path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=SCORES_FIELDNAMES, extrasaction="ignore")
+        writer.writeheader()
+        for rank, row in enumerate(scores, start=1):
+            writer.writerow({"rank": rank, **row})
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +196,7 @@ def execute_rotation(selected: dict, dry_run: bool = False) -> list[dict]:
 # ---------------------------------------------------------------------------
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Execute Alpaca paper trades based on alpaca_selector.py output."
+        description="Rank ETF universe by predicted Sharpe and select one position."
     )
     parser.add_argument(
         "--date",
@@ -286,51 +205,53 @@ def main() -> int:
         help="Signal date (default: today).",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Log what would be traded without submitting orders.",
+        "--window",
+        type=int,
+        default=20,
+        help="Trailing momentum window in trading days (default: 20).",
     )
     args = parser.parse_args()
 
     date_str = args.date or date.today().isoformat()
-    log.info("=== Alpaca executor | date=%s  dry_run=%s ===", date_str, args.dry_run)
+    log.info("=== ETF selector | date=%s  universe=%s  window=%d ===",
+             date_str, ETF_UNIVERSE, args.window)
 
-    # Read selected position from selector output
-    selected = read_selected_position(date_str)
-    if selected is None:
+    # Score every ETF in the universe
+    scores = []
+    for ticker in ETF_UNIVERSE:
+        result = score_etf(ticker, date_str, args.window)
+        if result is not None:
+            scores.append(result)
+        else:
+            log.warning("%s: could not be scored — excluded from selection", ticker)
+
+    if not scores:
+        log.error("No ETF could be scored. Cannot select a position.")
         return 1
 
-    log.info(
-        "Selected position: ticker=%s  shares=%s  $%s  vol=%.4f  sharpe=%.4f",
-        selected.get("ticker"),
-        selected.get("desired_shares_int"),
-        selected.get("dollar_exposure"),
-        float(selected.get("forecast_vol_ann", 0)),
-        float(selected.get("predicted_sharpe", 0)),
-    )
+    # Rank highest predicted Sharpe first
+    scores.sort(key=lambda x: x["predicted_sharpe"], reverse=True)
 
-    # Execute rotation
-    records: list[dict]
-    try:
-        records = execute_rotation(selected, dry_run=args.dry_run)
-    except EnvironmentError as exc:
-        log.error("%s", exc)
-        return 1
-    except Exception as exc:
-        log.error("Unexpected error during execution: %s", exc, exc_info=True)
-        records = [_blank_record(selected.get("ticker", "UNKNOWN"), "error", "error", str(exc))]
+    log.info("ETF rankings by predicted Sharpe:")
+    for rank, s in enumerate(scores, start=1):
+        log.info(
+            "  #%d %-5s  sharpe=%.4f  mom=%.4f  vol=%.4f  shares=%d  $%.0f",
+            rank, s["ticker"], s["predicted_sharpe"],
+            s["trailing_return_ann"], s["forecast_vol_ann"],
+            s["desired_shares_int"], s["dollar_exposure"],
+        )
 
-    # Log every order (including no-ops and errors)
-    had_error = False
-    for record in records:
-        try:
-            append_order_log(date_str, record)
-        except Exception as exc:
-            log.error("Failed to write order log entry: %s", exc)
-        if record.get("status") == "error":
-            had_error = True
+    best = scores[0]
+    log.info("SELECTED: %s (predicted Sharpe %.4f)", best["ticker"], best["predicted_sharpe"])
 
-    return 1 if had_error else 0
+    # Write outputs
+    sel_path = write_selected(date_str, best)
+    log.info("Selected position written → %s", sel_path)
+
+    scores_path = write_scores(date_str, scores)
+    log.info("Full rankings written → %s", scores_path)
+
+    return 0
 
 
 if __name__ == "__main__":
