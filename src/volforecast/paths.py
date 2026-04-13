@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 # Base directories
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # src/volforecast -> src -> project root
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 CACHE_DIR = ARTIFACTS_DIR / "cache"
 SIGNALS_DIR = ARTIFACTS_DIR / "signals"
