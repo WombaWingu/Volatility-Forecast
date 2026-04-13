@@ -39,7 +39,7 @@ jobs:
           pip install -r requirements.txt
       - name: Run daily forecast (NVDA)
         run: |
-          python volforecast_cli.py daily --ticker NVDA --export --model ridge --equity 100000
+          python volforecast_cli.py daily --ticker SPY --export --model ridge --equity 100000
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
