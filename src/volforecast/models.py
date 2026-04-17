@@ -96,14 +96,15 @@ def har_rv_rolling_forecast(
 
 def ewma_volatility(returns: pd.Series, lam: float = 0.94, burn_in: int = 20) -> pd.Series:
     """
-    EWMA variance then volatility (annualized for 2-day horizon).
+    EWMA variance then volatility, annualized to 252 trading days.
     Uses burn_in observations to initialize variance.
     """
     ewma_var = pd.Series(index=returns.index, dtype=float)
     ewma_var.iloc[burn_in - 1] = returns.iloc[:burn_in].var()
     for i in range(burn_in, len(returns)):
         ewma_var.iloc[i] = lam * ewma_var.iloc[i - 1] + (1 - lam) * (returns.iloc[i - 1] ** 2)
-    return annualize_vol(np.sqrt(ewma_var))
+    # horizon_days=1: ewma_var is daily variance, so annualize with sqrt(252/1)
+    return annualize_vol(np.sqrt(ewma_var), horizon_days=1)
 
 
 def _garch_rolling_forecast_impl(

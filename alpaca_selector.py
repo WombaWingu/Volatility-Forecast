@@ -5,7 +5,7 @@ For each ETF in the universe:
   1. Reads volatility_signals_<TICKER>.csv   — for recent closes (momentum)
   2. Reads tomorrow_positions_<TICKER>.csv  — for forecast_vol_ann + desired shares
 
-Scores each ETF with predicted Sharpe = annualized 20-day momentum / forecast_vol_ann.
+Scores each ETF with predicted Sharpe = annualized 63-day momentum / forecast_vol_ann.
 Picks the single ETF with the highest score and writes two files:
 
     artifacts/signals/<DATE>/selected_position.csv   — winning ETF + position details
@@ -115,14 +115,17 @@ def load_closes(ticker: str, date_str: str) -> pd.Series | None:
 # ---------------------------------------------------------------------------
 def annualized_momentum(closes: pd.Series, window: int) -> float | None:
     """
-    Trailing *window*-day return annualized to 252 trading days.
+    Trailing *window*-day return annualized to 252 trading days via simple
+    (linear) scaling.  Geometric compounding over short windows (e.g. 20 days)
+    raises even modest returns to unrealistically large annual figures; simple
+    annualization keeps the numerator in the same ballpark as the vol denominator.
 
     Returns None if there are not enough observations.
     """
     if len(closes) < window + 1:
         return None
     r = float(closes.iloc[-1] / closes.iloc[-(window + 1)] - 1)
-    return (1.0 + r) ** (252.0 / window) - 1.0
+    return r * (252.0 / window)
 
 
 def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
@@ -207,8 +210,8 @@ def main() -> int:
     parser.add_argument(
         "--window",
         type=int,
-        default=20,
-        help="Trailing momentum window in trading days (default: 20).",
+        default=63,
+        help="Trailing momentum window in trading days (default: 63 ≈ one quarter).",
     )
     args = parser.parse_args()
 
