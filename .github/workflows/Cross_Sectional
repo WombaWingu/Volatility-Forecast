@@ -1,0 +1,39 @@
+name: Cross_sectional
+
+on:
+  schedule:
+    - cron: "0 22 * * 1-5"   # 22:00 UTC = 5 PM ET, Mon–Fri
+  workflow_dispatch:          # Allow manual run
+
+ cross_sectional:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install html5lib
+      - name: Fetch S&P 500 tickers (first 200)
+        run: python scripts/fetch_sp500_tickers.py --format csv --out data/sp500_tickers.txt
+      - name: Run cross-sectional (200 stocks)
+        run: |
+          TICKERS=$(cat data/sp500_tickers.txt)
+          python volforecast_cli.py cross-sectional --tickers "$TICKERS" --export artifacts/cross_sectional/cross_section_results.csv
+      - name: Top 10 stocks to invest
+        run: |
+          python scripts/top_stocks_from_cross_section.py artifacts/cross_sectional/cross_section_results.csv -n 10 --out artifacts/cross_sectional/top10_stocks.csv
+          echo "--- Top 10 stocks (best volatility forecast accuracy) ---"
+          cat artifacts/cross_sectional/top10_stocks.csv
+      - name: Upload cross-sectional artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-sectional-${{ github.run_id }}
+          path: |
+            artifacts/cross_sectional/
+            data/sp500_tickers.txt
