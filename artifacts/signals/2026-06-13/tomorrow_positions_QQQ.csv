@@ -1,0 +1,2 @@
+signal_date,trade_date,ticker,model_used,forecast_vol_ann,target_vol_ann,cap,floor,close,desired_shares_int,dollar_exposure,exposure_multiplier
+2026-06-12,2026-06-13,QQQ,ridge,0.2677244008420374,0.1,1.0,0.05,721.3400268554688,52,37509.681396484375,0.37509681396484373

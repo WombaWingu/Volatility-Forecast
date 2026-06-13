@@ -1,0 +1,2 @@
+signal_date,trade_date,ticker,model_used,forecast_vol_ann,target_vol_ann,cap,floor,close,desired_shares_int,dollar_exposure,exposure_multiplier
+2026-06-12,2026-06-13,IWM,ridge,0.2241931229263308,0.1,1.0,0.05,292.95001220703125,152,44528.40185546875,0.4452840185546875

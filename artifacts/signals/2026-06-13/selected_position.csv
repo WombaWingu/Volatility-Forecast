@@ -1,0 +1,2 @@
+ticker,signal_date,trade_date,desired_shares_int,dollar_exposure,forecast_vol_ann,trailing_return_ann,risk_adj_score,close,exposure_multiplier
+XLF,2026-06-12,2026-06-13,1875,100012.5002861023,0.09871215472536043,0.09662890841011817,0.9788957467189494,53.34000015258789,1.000125002861023

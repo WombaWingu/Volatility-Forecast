@@ -5,7 +5,7 @@ For each ETF in the universe:
   1. Reads volatility_signals_<TICKER>.csv   — for recent closes (momentum)
   2. Reads tomorrow_positions_<TICKER>.csv  — for forecast_vol_ann + desired shares
 
-Scores each ETF with predicted Sharpe = annualized 63-day momentum / forecast_vol_ann.
+Scores each ETF with Risk Adjusted Score = annualized 63-day momentum / forecast_vol_ann.
 Picks the single ETF with the highest score and writes two files:
 
     artifacts/signals/<DATE>/selected_position.csv   — winning ETF + position details
@@ -50,7 +50,7 @@ SELECTED_FIELDNAMES = [
     "dollar_exposure",
     "forecast_vol_ann",
     "trailing_return_ann",
-    "predicted_sharpe",
+    "risk_adj_score",
     "close",
     "exposure_multiplier",
 ]
@@ -58,7 +58,7 @@ SELECTED_FIELDNAMES = [
 SCORES_FIELDNAMES = [
     "rank",
     "ticker",
-    "predicted_sharpe",
+    "risk_adj_score",
     "trailing_return_ann",
     "forecast_vol_ann",
     "desired_shares_int",
@@ -113,7 +113,7 @@ def load_closes(ticker: str, date_str: str) -> pd.Series | None:
 # ---------------------------------------------------------------------------
 # Sharpe scoring
 # ---------------------------------------------------------------------------
-def annualized_momentum(closes: pd.Series, window: int) -> float | None:
+def risk_adj_momentum(closes: pd.Series, window: int) -> float | None:
     """
     Trailing *window*-day return annualized to 252 trading days via simple
     (linear) scaling.  Geometric compounding over short windows (e.g. 20 days)
@@ -124,13 +124,13 @@ def annualized_momentum(closes: pd.Series, window: int) -> float | None:
     """
     if len(closes) < window + 1:
         return None
-    r = float(closes.iloc[-1] / closes.iloc[-(window + 1)] - 1)
-    return r * (252.0 / window)
+    return float(closes.iloc[-1] / closes.iloc[-(window + 1)] - 1)
+    
 
 
 def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
     """
-    Compute predicted Sharpe for one ETF.
+    Compute Risk Adjusted Score for one ETF.
 
     Returns a score dict or None if any required data is missing.
     """
@@ -147,7 +147,7 @@ def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
     if closes is None:
         return None
 
-    trailing_ret = annualized_momentum(closes, window)
+    trailing_ret = risk_adj_momentum(closes, window)
     if trailing_ret is None:
         log.warning(
             "%s: not enough price history for %d-day momentum (have %d rows) — skipping",
@@ -155,8 +155,9 @@ def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
         )
         return None
 
-    # Predicted Sharpe: annualized momentum / forecast vol (risk-free ≈ 0 for ranking)
-    predicted_sharpe = trailing_ret / max(forecast_vol, 1e-6)
+    # Risk adjusted score : annualized momentum / forecast vol (risk-free ≈ 0 for ranking)
+    
+    risk_adj_score  = trailing_ret / max(forecast_vol, 1e-6)
 
     return {
         "ticker": ticker,
@@ -166,7 +167,7 @@ def score_etf(ticker: str, date_str: str, window: int) -> dict | None:
         "dollar_exposure": float(positions.get("dollar_exposure", 0)),
         "forecast_vol_ann": forecast_vol,
         "trailing_return_ann": trailing_ret,
-        "predicted_sharpe": predicted_sharpe,
+        "risk_adj_score": risk_adj_score ,
         "close": float(positions.get("close", 0)),
         "exposure_multiplier": float(positions.get("exposure_multiplier", 0)),
     }
@@ -199,7 +200,7 @@ def write_scores(date_str: str, scores: list[dict]) -> Path:
 # ---------------------------------------------------------------------------
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Rank ETF universe by predicted Sharpe and select one position."
+        description="Rank ETF universe by risk adjusted score and select one position."
     )
     parser.add_argument(
         "--date",
@@ -232,20 +233,20 @@ def main() -> int:
         log.error("No ETF could be scored. Cannot select a position.")
         return 1
 
-    # Rank highest predicted Sharpe first
-    scores.sort(key=lambda x: x["predicted_sharpe"], reverse=True)
+    # Rank highest Risk Adjusted Score first
+    scores.sort(key=lambda x: x["risk_adj_score"], reverse=True)
 
     log.info("ETF rankings by predicted Sharpe:")
     for rank, s in enumerate(scores, start=1):
         log.info(
             "  #%d %-5s  sharpe=%.4f  mom=%.4f  vol=%.4f  shares=%d  $%.0f",
-            rank, s["ticker"], s["predicted_sharpe"],
+            rank, s["ticker"], s["risk_adj_score"],
             s["trailing_return_ann"], s["forecast_vol_ann"],
             s["desired_shares_int"], s["dollar_exposure"],
         )
 
     best = scores[0]
-    log.info("SELECTED: %s (predicted Sharpe %.4f)", best["ticker"], best["predicted_sharpe"])
+    log.info("SELECTED: %s (Risk Adjusted Score %.4f)", best["ticker"], best["risk_adj_score"])
 
     # Write outputs
     sel_path = write_selected(date_str, best)
