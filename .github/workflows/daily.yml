@@ -87,6 +87,7 @@ jobs:
         with:
           name: paper-trading-orders-${{ github.run_id }}
           path: artifacts/signals/
+<<<<<<< HEAD
 
   cross_sectional:
     needs: test
@@ -121,3 +122,5 @@ jobs:
           path: |
             artifacts/cross_sectional/
             data/sp500_tickers.txt
+=======
+>>>>>>> 5c3b4616596d8f775c9664b2ff826eaa317cb4e2
