@@ -19,12 +19,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Ensure `src/` is importable when running as a script
-_root = Path(__file__).resolve().parent.parent
-_src = _root / "src"
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
 from volforecast import backtest as vbt
 from volforecast import data as vd
 from volforecast import distributions as vdist
@@ -33,6 +27,11 @@ from volforecast import models as vm
 from volforecast import paths as vpaths
 from volforecast import risk as vr
 
+# Ensure `src/` is importable when running as a script
+_root = Path(__file__).resolve().parent.parent
+_src = _root / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
 # Suppress GARCH optimizer convergence warnings (from arch/scipy)
 warnings.filterwarnings("ignore", message=".*optimizer.*")
 warnings.filterwarnings("ignore", message=".*onvergence.*")
